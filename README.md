@@ -64,6 +64,7 @@ SELECT
 FROM session_funnel;
 ```
 And get the rates here\![global conversion rates](1.png)
+
 (Visualization may go here...)
 
 From the above results, we can see that the conversion is lowest between add to cart and checkout, which indicates that there may be some issues in the checkout process that are causing customers to abandon their carts. Possible reasons could include a complicated checkout process, unexpected costs (like shipping fees), unsatisfied vouchers, or limited payment options. To improve the conversion rate, we can promote sales activities such as getting more vouchers when reaching specific price, considering simplifying the checkout process, providing clear information about costs upfront, and offering multiple payment options.
@@ -109,6 +110,7 @@ ORDER BY overall_conversion_rate DESC;
 ```
 
 ![conversion rates by device type](2.png)
+
 From the above results, we can see that the conversion rates differ slightly by source type, but the flow differs significantly. For example, the paid source has the highest overall conversion rate, which indicates that the platform promotion and paid ads are effective in driving conversions. On the other hand, the referral and social source has a relatively high conversion rate, which suggests that customers coming from other websites may be as engaged or interested in making a purchase, meanwhile referral gets the smallest flow. However, the lowest conversion rate happens on organic source, which brings the largest flow to the shopping platform. To improve conversion rates for organic traffic, we can consider investing more money on ads, optimizing our SEO strategies, creating high-quality content, and ensuring that the landing pages for organic flow are relevant and engaging.
 
 ### Conversion rates by device type
@@ -142,6 +144,7 @@ GROUP BY device
 ORDER BY conversion_rate DESC;
 ```
 It's not hard to find that mobile is still provides the largest flow and has the highest conversion rate, which is not surprising because mobile shopping has become increasingly popular among customers and become the daily habit for many people. The conversion rates are similar among 3 device types, while the flow on tablet is significantly smaller than the other two, which means the shopping experience on tablet may need to be enhanced.
+
 ![conversion rates by device type](3.png)
 
 ## 2. Analyze orders and products
@@ -170,6 +173,7 @@ GROUP BY DATE_FORMAT(order_time, '%Y-%m')
 ORDER BY order_month;
 ```
 ![GMV trend](5.png)
+
 (Visualization may go here...)
 
 From the above results, we can see that there is a seasonal pattern in the GMV trend, with troughs in spring and summer, especially in July. But there maybe special sales or trends in 2021-07. In global, GMV doesn't show a significant growth or decline trend, which indicates that the overall performance of the e-commerce platform is relatively stable.
@@ -193,6 +197,7 @@ GROUP BY discount_group
 ORDER BY total_orders DESC;
 ```
 ![discount distribution](6.png)
+
 From the above results, we can see that the majority of orders are made with low discount, which indicates that customers are more likely to make a purchase when there is a discount, but they may not be as sensitive to higher discounts. The total revenue and average order value are higher for orders with no discount, and total orders are higher for orders with low discount, which suggests that offering moderate discounts can be an effective strategy for increasing sales. However, it's important to note that the optimal discount strategy may vary depending on the specific products and target audience.
 
 ### conversion under different discount
@@ -241,6 +246,7 @@ GROUP BY rating
 ORDER BY rating;
 ```
 ![ratings distribution](7.png)
+
 From the above results, we can see that the majority of ratings are 4 and 5, which indicates that customers are generally satisfied with their purchases. However, there are still a significant number of ratings that are 1, 2, and 3, which suggests that there may be some issues with the products or the customer experience that need to be addressed. To improve customer satisfaction and ratings, we can consider implementing quality control measures, providing better customer support, and actively seeking feedback from customers to identify and address any issues.
 
 ### low rating
@@ -296,6 +302,7 @@ ORDER BY s.total_qty DESC, avg_rating ASC
 LIMIT 200;
 ```
 ![high sales but low rating products](9.png)
+
 From the above results, we can identify products that have high sales but low ratings, which may indicate that there are issues with the product quality or customer experience that need to be addressed. To improve the ratings for these products, we can consider implementing quality control measures, providing better customer support, and actively seeking feedback from customers to identify and address any issues. Additionally, we can consider offering incentives for customers to leave reviews, such as discounts on future purchases or entry into a prize draw, which can help increase the number of reviews and provide more feedback for improvement.
 
 ## Total summary
