@@ -227,3 +227,183 @@ WHERE r.review_cnt >= 5
  and s.total_qty >= 100 and r.avg_rating <= 3.5
 ORDER BY s.total_qty DESC, avg_rating ASC
 LIMIT 200;
+
+
+# customer classification
+CREATE TABLE customer_segmentation AS
+WITH session_agg AS (
+    SELECT
+        customer_id,
+        COUNT(*) AS session_cnt
+    FROM sessions
+    GROUP BY customer_id
+),
+event_agg AS (
+    SELECT
+        s.customer_id,
+        SUM(CASE WHEN e.event_type = 'page_view' THEN 1 ELSE 0 END) AS page_view_cnt,
+        SUM(CASE WHEN e.event_type = 'add_to_cart' THEN 1 ELSE 0 END) AS add_to_cart_cnt,
+        SUM(CASE WHEN e.event_type = 'checkout' THEN 1 ELSE 0 END) AS checkout_cnt,
+        SUM(CASE WHEN e.event_type = 'purchase' THEN 1 ELSE 0 END) AS purchase_event_cnt
+    FROM events e
+    JOIN sessions s
+      ON e.session_id = s.session_id
+    GROUP BY s.customer_id
+),
+order_agg AS (
+    SELECT
+        customer_id,
+        COUNT(*) AS order_cnt,
+        SUM(total_usd) AS total_spent,
+        AVG(total_usd) AS avg_order_value,
+        MAX(order_time) AS last_order_time
+    FROM orders
+    GROUP BY customer_id
+),
+review_agg AS (
+    SELECT
+        o.customer_id,
+        COUNT(r.review_id) AS review_cnt,
+        AVG(r.rating) AS avg_rating
+    FROM reviews r
+    JOIN orders o
+      ON r.order_id = o.order_id
+    GROUP BY o.customer_id
+)
+SELECT
+    c.customer_id,
+    c.name,
+    c.email,
+    c.country,
+    c.age,
+    c.signup_date,
+    c.marketing_opt_in,
+    COALESCE(sa.session_cnt, 0) AS session_cnt,
+    COALESCE(ea.page_view_cnt, 0) AS page_view_cnt,
+    COALESCE(ea.add_to_cart_cnt, 0) AS add_to_cart_cnt,
+    COALESCE(ea.checkout_cnt, 0) AS checkout_cnt,
+    COALESCE(ea.purchase_event_cnt, 0) AS purchase_event_cnt,
+    COALESCE(oa.order_cnt, 0) AS order_cnt,
+    COALESCE(oa.total_spent, 0) AS total_spent,
+    COALESCE(oa.avg_order_value, 0) AS avg_order_value,
+    oa.last_order_time,
+    CASE
+        WHEN oa.last_order_time IS NULL THEN NULL
+        ELSE DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time)
+    END AS recency_days,
+    COALESCE(ra.review_cnt, 0) AS review_cnt,
+    COALESCE(ra.avg_rating, 0) AS avg_rating,
+    CASE
+        WHEN COALESCE(oa.order_cnt, 0) >= 5
+             AND COALESCE(oa.total_spent, 0) >= 1000
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) <= 30
+            THEN 'High Value'
+        WHEN COALESCE(oa.order_cnt, 0) BETWEEN 2 AND 4
+             AND COALESCE(oa.total_spent, 0) >= 300
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) <= 60
+            THEN 'Potential'
+        WHEN COALESCE(ea.page_view_cnt, 0) >= 20
+             AND COALESCE(ea.add_to_cart_cnt, 0) >= 3
+             AND COALESCE(oa.order_cnt, 0) = 0
+            THEN 'Hesitant'
+        WHEN COALESCE(ra.review_cnt, 0) >= 3
+             AND COALESCE(oa.order_cnt, 0) >= 1
+            THEN 'Engaged'
+        WHEN COALESCE(oa.order_cnt, 0) >= 1
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) > 90
+            THEN 'At Risk'
+        ELSE 'Low Activity'
+    END AS customer_segment
+FROM customers c
+LEFT JOIN session_agg sa
+    ON c.customer_id = sa.customer_id
+LEFT JOIN event_agg ea
+    ON c.customer_id = ea.customer_id
+LEFT JOIN order_agg oa
+    ON c.customer_id = oa.customer_id
+LEFT JOIN review_agg ra
+    ON c.customer_id = ra.customer_id;
+    
+SELECT
+    customer_segment,
+    COUNT(*) AS customer_cnt
+FROM customer_segmentation
+GROUP BY customer_segment
+ORDER BY customer_cnt DESC;
+
+# customer classification with details
+CREATE TABLE customer_segment_simple AS
+WITH session_agg AS (
+    SELECT
+        customer_id,
+        COUNT(*) AS session_cnt
+    FROM sessions
+    GROUP BY customer_id
+),
+event_agg AS (
+    SELECT
+        s.customer_id,
+        SUM(CASE WHEN e.event_type = 'page_view' THEN 1 ELSE 0 END) AS page_view_cnt,
+        SUM(CASE WHEN e.event_type = 'add_to_cart' THEN 1 ELSE 0 END) AS add_to_cart_cnt,
+        SUM(CASE WHEN e.event_type = 'checkout' THEN 1 ELSE 0 END) AS checkout_cnt,
+        SUM(CASE WHEN e.event_type = 'purchase' THEN 1 ELSE 0 END) AS purchase_event_cnt
+    FROM events e
+    JOIN sessions s
+      ON e.session_id = s.session_id
+    GROUP BY s.customer_id
+),
+order_agg AS (
+    SELECT
+        customer_id,
+        COUNT(*) AS order_cnt,
+        SUM(total_usd) AS total_spent,
+        MAX(order_time) AS last_order_time
+    FROM orders
+    GROUP BY customer_id
+),
+review_agg AS (
+    SELECT
+        o.customer_id,
+        COUNT(r.review_id) AS review_cnt
+    FROM reviews r
+    JOIN orders o
+      ON r.order_id = o.order_id
+    GROUP BY o.customer_id
+)
+SELECT
+    c.customer_id,
+    c.name,
+    CASE
+        WHEN COALESCE(oa.order_cnt, 0) >= 5
+             AND COALESCE(oa.total_spent, 0) >= 1000
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) <= 30
+            THEN 'High Value'
+        WHEN COALESCE(oa.order_cnt, 0) BETWEEN 2 AND 4
+             AND COALESCE(oa.total_spent, 0) >= 300
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) <= 60
+            THEN 'Potential'
+        WHEN COALESCE(ea.page_view_cnt, 0) >= 20
+             AND COALESCE(ea.add_to_cart_cnt, 0) >= 3
+             AND COALESCE(oa.order_cnt, 0) = 0
+            THEN 'Hesitant'
+        WHEN COALESCE(ra.review_cnt, 0) >= 3
+             AND COALESCE(oa.order_cnt, 0) >= 1
+            THEN 'Engaged'
+        WHEN COALESCE(oa.order_cnt, 0) >= 1
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) > 90
+            THEN 'At Risk'
+        ELSE 'Low Activity'
+    END AS customer_segment
+FROM customers c
+LEFT JOIN session_agg sa
+    ON c.customer_id = sa.customer_id
+LEFT JOIN event_agg ea
+    ON c.customer_id = ea.customer_id
+LEFT JOIN order_agg oa
+    ON c.customer_id = oa.customer_id
+LEFT JOIN review_agg ra
+    ON c.customer_id = ra.customer_id;
+    
+SELECT *
+FROM customer_segment_simple
+ORDER BY customer_id;
