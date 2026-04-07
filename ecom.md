@@ -64,6 +64,7 @@ SELECT
 FROM session_funnel;
 ```
 And get the rates here\![global conversion rates](1.png)
+
 (Visualization may go here...)
 
 From the above results, we can see that the conversion is lowest between add to cart and checkout, which indicates that there may be some issues in the checkout process that are causing customers to abandon their carts. Possible reasons could include a complicated checkout process, unexpected costs (like shipping fees), unsatisfied vouchers, or limited payment options. To improve the conversion rate, we can promote sales activities such as getting more vouchers when reaching specific price, considering simplifying the checkout process, providing clear information about costs upfront, and offering multiple payment options.
@@ -109,6 +110,7 @@ ORDER BY overall_conversion_rate DESC;
 ```
 
 ![conversion rates by device type](2.png)
+
 From the above results, we can see that the conversion rates differ slightly by source type, but the flow differs significantly. For example, the paid source has the highest overall conversion rate, which indicates that the platform promotion and paid ads are effective in driving conversions. On the other hand, the referral and social source has a relatively high conversion rate, which suggests that customers coming from other websites may be as engaged or interested in making a purchase, meanwhile referral gets the smallest flow. However, the lowest conversion rate happens on organic source, which brings the largest flow to the shopping platform. To improve conversion rates for organic traffic, we can consider investing more money on ads, optimizing our SEO strategies, creating high-quality content, and ensuring that the landing pages for organic flow are relevant and engaging.
 
 ### Conversion rates by device type
@@ -142,6 +144,7 @@ GROUP BY device
 ORDER BY conversion_rate DESC;
 ```
 It's not hard to find that mobile is still provides the largest flow and has the highest conversion rate, which is not surprising because mobile shopping has become increasingly popular among customers and become the daily habit for many people. The conversion rates are similar among 3 device types, while the flow on tablet is significantly smaller than the other two, which means the shopping experience on tablet may need to be enhanced.
+
 ![conversion rates by device type](3.png)
 
 ## 2. Analyze orders and products
@@ -170,6 +173,7 @@ GROUP BY DATE_FORMAT(order_time, '%Y-%m')
 ORDER BY order_month;
 ```
 ![GMV trend](5.png)
+
 (Visualization may go here...)
 
 From the above results, we can see that there is a seasonal pattern in the GMV trend, with troughs in spring and summer, especially in July. But there maybe special sales or trends in 2021-07. In global, GMV doesn't show a significant growth or decline trend, which indicates that the overall performance of the e-commerce platform is relatively stable.
@@ -193,6 +197,7 @@ GROUP BY discount_group
 ORDER BY total_orders DESC;
 ```
 ![discount distribution](6.png)
+
 From the above results, we can see that the majority of orders are made with low discount, which indicates that customers are more likely to make a purchase when there is a discount, but they may not be as sensitive to higher discounts. The total revenue and average order value are higher for orders with no discount, and total orders are higher for orders with low discount, which suggests that offering moderate discounts can be an effective strategy for increasing sales. However, it's important to note that the optimal discount strategy may vary depending on the specific products and target audience.
 
 ### conversion under different discount
@@ -241,6 +246,7 @@ GROUP BY rating
 ORDER BY rating;
 ```
 ![ratings distribution](7.png)
+
 From the above results, we can see that the majority of ratings are 4 and 5, which indicates that customers are generally satisfied with their purchases. However, there are still a significant number of ratings that are 1, 2, and 3, which suggests that there may be some issues with the products or the customer experience that need to be addressed. To improve customer satisfaction and ratings, we can consider implementing quality control measures, providing better customer support, and actively seeking feedback from customers to identify and address any issues.
 
 ### low rating
@@ -296,7 +302,135 @@ ORDER BY s.total_qty DESC, avg_rating ASC
 LIMIT 200;
 ```
 ![high sales but low rating products](9.png)
+
 From the above results, we can identify products that have high sales but low ratings, which may indicate that there are issues with the product quality or customer experience that need to be addressed. To improve the ratings for these products, we can consider implementing quality control measures, providing better customer support, and actively seeking feedback from customers to identify and address any issues. Additionally, we can consider offering incentives for customers to leave reviews, such as discounts on future purchases or entry into a prize draw, which can help increase the number of reviews and provide more feedback for improvement.
+
+## 5. Analyze customers
+### classify customers by their purchasing behavior
+
+We classify customers into different segments based on their clicking, purchasing and commenting behavior as below:
+
+- High Value: Customers who have made at least 5 orders, spent at least $1000, and made a purchase within the last 30 days.
+  
+```
+order_cnt >= 5
+and total_spent >= 1000
+and recency_days <= 30
+```
+
+- Potential: Customers who have made between 2 and 4 orders, spent at least $300, and made a purchase within the last 60 days.
+  
+```
+order_cnt between 2 and 4
+and total_spent >= 300
+and recency_days <= 60
+```
+
+- Hesitant: Customers who have made at least 20 page views, added to cart at least 3 times, but have not made any purchases.
+
+```
+page_view_cnt >= 20
+and add_to_cart_cnt >= 3
+and order_cnt = 0
+```
+
+- Engaged: Customers who have made at least 3 reviews and at least 1 purchase.
+
+```
+review_cnt >= 3
+and order_cnt >= 1
+```
+
+- At Risk: Customers who have made at least 1 purchase but have not made a purchase in the last 90 days.
+
+```
+order_cnt >= 1
+and recency_days > 90
+```
+
+- Low Activity: Customers who do not fit into any of the above segments, indicating low engagement and purchasing activity.
+
+```sql
+CREATE TABLE customer_segment_simple AS
+WITH session_agg AS (
+    SELECT
+        customer_id,
+        COUNT(*) AS session_cnt
+    FROM sessions
+    GROUP BY customer_id
+),
+event_agg AS (
+    SELECT
+        s.customer_id,
+        SUM(CASE WHEN e.event_type = 'page_view' THEN 1 ELSE 0 END) AS page_view_cnt,
+        SUM(CASE WHEN e.event_type = 'add_to_cart' THEN 1 ELSE 0 END) AS add_to_cart_cnt,
+        SUM(CASE WHEN e.event_type = 'checkout' THEN 1 ELSE 0 END) AS checkout_cnt,
+        SUM(CASE WHEN e.event_type = 'purchase' THEN 1 ELSE 0 END) AS purchase_event_cnt
+    FROM events e
+    JOIN sessions s
+      ON e.session_id = s.session_id
+    GROUP BY s.customer_id
+),
+order_agg AS (
+    SELECT
+        customer_id,
+        COUNT(*) AS order_cnt,
+        SUM(total_usd) AS total_spent,
+        MAX(order_time) AS last_order_time
+    FROM orders
+    GROUP BY customer_id
+),
+review_agg AS (
+    SELECT
+        o.customer_id,
+        COUNT(r.review_id) AS review_cnt
+    FROM reviews r
+    JOIN orders o
+      ON r.order_id = o.order_id
+    GROUP BY o.customer_id
+)
+SELECT
+    c.customer_id,
+    c.name,
+    CASE
+        WHEN COALESCE(oa.order_cnt, 0) >= 5
+             AND COALESCE(oa.total_spent, 0) >= 1000
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) <= 30
+            THEN 'High Value'
+        WHEN COALESCE(oa.order_cnt, 0) BETWEEN 2 AND 4
+             AND COALESCE(oa.total_spent, 0) >= 300
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) <= 60
+            THEN 'Potential'
+        WHEN COALESCE(ea.page_view_cnt, 0) >= 20
+             AND COALESCE(ea.add_to_cart_cnt, 0) >= 3
+             AND COALESCE(oa.order_cnt, 0) = 0
+            THEN 'Hesitant'
+        WHEN COALESCE(ra.review_cnt, 0) >= 3
+             AND COALESCE(oa.order_cnt, 0) >= 1
+            THEN 'Engaged'
+        WHEN COALESCE(oa.order_cnt, 0) >= 1
+             AND DATEDIFF((SELECT MAX(order_time) FROM orders), oa.last_order_time) > 90
+            THEN 'At Risk'
+        ELSE 'Low Activity'
+    END AS customer_segment
+FROM customers c
+LEFT JOIN session_agg sa
+    ON c.customer_id = sa.customer_id
+LEFT JOIN event_agg ea
+    ON c.customer_id = ea.customer_id
+LEFT JOIN order_agg oa
+    ON c.customer_id = oa.customer_id
+LEFT JOIN review_agg ra
+    ON c.customer_id = ra.customer_id;
+    
+SELECT *
+FROM customer_segment_simple
+ORDER BY customer_id;
+```
+![Customer classification](10.png)
+![Customer segment distribution](11.png)
+
+From the result we can find that the majority of customers fall into the at risk segment, which means the shopping platform is not able to retain customers effectively. Still large number of customers are classified as low activity, which indicates that there may be a significant portion of customers who are not engaging with the platform or making purchases.
 
 ## Total summary
 In this project, we analyzed e-commerce data using MySQL to gain insights into customer behavior, conversion rates, orders, discounts, and ratings. The global sales pattern is mature and stable, We found that the conversion rates differ by source type and device type, with mobile showing the highest conversion rate. We also identified seasonal patterns in GMV and found that moderate discounts can be effective in increasing sales. Additionally, we analyzed ratings and identified products with high sales but low ratings, which may indicate issues with product quality or customer experience. Overall, this analysis can help inform business decisions and strategies for improving the e-commerce platform.
