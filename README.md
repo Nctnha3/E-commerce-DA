@@ -63,7 +63,9 @@ SELECT
     ROUND(SUM(has_purchase) / SUM(has_view), 4) AS overall_conversion_rate
 FROM session_funnel;
 ```
-And get the rates here\![global conversion rates](1.png)
+And get the rates here：
+
+![global conversion rates](1.png)
 
 (Visualization may go here...)
 
